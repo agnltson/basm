@@ -112,8 +112,10 @@ fn is_number(val: &str) -> bool {
     }
 }
 
-// hexa/binary representation are parser as bits pattern in two's complement (eg 0xFFFFFFFF = -1)
-// in decimal the value mean the value (eg -1 = -1)
+// hexa/binary representation are parsed as bits pattern.
+// For immediate we are using two's complement (eg 0xFFFFFFFF -> -1).
+// For Belt index we use regular unsigned representation (ex 0b11111 -> 31).
+// in decimal the value mean the value (eg -1 = -1).
 fn extract_number(val: &str) -> Result<i32, BasmError> {
     let chars: Vec<char> = val.chars().collect();
     let radix;
