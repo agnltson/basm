@@ -1,22 +1,39 @@
 use std::collections::HashMap;
+use std::str::SplitWhitespace;
 
-use crate::ast::{Program, InstructionKind, Instruction};
+use crate::ast::{Program, InstructionKind, Instruction, Parameter};
 use crate::error::BasmError;
+use crate::numerics::{u5, i26};
 
-pub fn parse<'a>(input: &'a str) -> Result<Program<'a>, BasmError> {
+pub fn parse(input: & str) -> Result<Program, BasmError> {
     if !input.is_ascii() {
         return Err(BasmError::NonAsciiInput);
     }
 
-    let mut labels: HashMap<&'a str, usize> = HashMap::new();
-    let mut remaining_lines: Vec<&'a str> = Vec::new();
+    let mut labels: HashMap<&str, i32> = HashMap::new();
+    let mut remaining_lines: Vec<&str> = Vec::new();
 
     separation_pass(input, &mut labels, &mut remaining_lines);
 
-    Ok(Program::new(Vec::new()))
+    let mut instruction_counter = 0;
+
+    let mut instructions: Vec<Instruction> = Vec::new();
+
+    for mut line in remaining_lines.iter().map(|l| l.split_whitespace()).into_iter() {
+        if let Some(word) = line.next() {
+            let kind: InstructionKind = InstructionKind::get_instruction_kind(word)?;
+            match collect_parameters(&labels, instruction_counter, &kind, &mut line) {
+                Ok(parameters) => instructions.push(Instruction::new(kind, parameters)),
+                Err(e) => { return Err(e) },
+            }
+        } else {
+            continue;
+        }
+    }
+    Ok(Program::new(instructions))
 }
 
-fn separation_pass<'a>(input: &'a str, labels: &mut HashMap<&'a str, usize>, remaining_lines: &mut Vec<&'a str>) {
+fn separation_pass<'a>(input: &'a str, labels: &mut HashMap<&'a str, i32>, remaining_lines: &mut Vec<&'a str>) {
     let mut instruction_counter = 0;
 
     let mut lines = input.lines();
@@ -40,4 +57,56 @@ fn separation_pass<'a>(input: &'a str, labels: &mut HashMap<&'a str, usize>, rem
             }
         }
     }
+}
+
+fn collect_parameters(labels: &HashMap<&str, i32>, instruction_counter: i32, kind: &InstructionKind, line: &mut SplitWhitespace) -> Result<Vec<Parameter>, BasmError> {
+    if kind.is_type0() {
+        collect_i26_parameters(labels, instruction_counter, line)
+    } else {
+        collect_u5_parameters(line)
+    }
+}
+
+fn collect_i26_parameters(labels: &HashMap<&str, i32>, instruction_counter: i32, line: &mut SplitWhitespace) -> Result<Vec<Parameter>, BasmError> {
+    let mut parameters = Vec::new();
+    while let Some(param) = line.next() {
+        if is_number(param) {
+            let val = extract_number(param)?;
+            parameters.push(Parameter::Immediate(i26(val)));
+        } else {
+            if let Some(addr) = labels.get(param) {
+                let offset = addr - instruction_counter - 1;
+                parameters.push(Parameter::Immediate(i26(offset)));
+            } else {
+                return Err(BasmError::Default);
+            }
+        }
+    }
+    Ok(parameters)
+}
+
+fn collect_u5_parameters(line: &mut SplitWhitespace) -> Result<Vec<Parameter>, BasmError> {
+    let mut parameters = Vec::new();
+    while let Some(param) = line.next() {
+        if is_number(param) {
+            let val = extract_number(param)?;
+            parameters.push(Parameter::BeltIndex(u5(val as u8)));
+        } else {
+            return Err(BasmError::Default);
+        }
+    }
+    Ok(parameters)
+}
+
+fn is_number(val: &str) -> bool {
+    true
+    /*if let Ok(_) = val.parse::<i32>() {
+        true
+    } else {
+        false
+    }*/
+}
+
+fn extract_number(val: &str) -> Result<i32, BasmError> {
+    Ok(0)
 }

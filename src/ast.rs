@@ -1,10 +1,13 @@
+use crate::error::BasmError;
+use crate::numerics::{u5, i26};
+
 #[derive(Debug)]
-pub struct Program<'a> {
-    instructions: Vec<Instruction<'a>>,
+pub struct Program {
+    instructions: Vec<Instruction>,
 }
 
-impl<'a> Program<'a> {
-    pub fn new(instructions: Vec<Instruction<'a>>) -> Self {
+impl Program {
+    pub fn new(instructions: Vec<Instruction>) -> Self {
         Self {
             instructions,
         }
@@ -12,13 +15,13 @@ impl<'a> Program<'a> {
 }
 
 #[derive(Debug)]
-pub struct Instruction<'a> {
+pub struct Instruction {
     kind: InstructionKind,
-    parameter: Parameter<'a>,
+    parameter: Vec<Parameter>,
 }
 
-impl<'a> Instruction<'a> {
-    pub fn new(kind: InstructionKind, parameter: Parameter<'a>) -> Self {
+impl Instruction {
+    pub fn new(kind: InstructionKind, parameter: Vec<Parameter>) -> Self {
         Self {
             kind,
             parameter,
@@ -112,7 +115,7 @@ impl InstructionKind {
         }
     }
 
-    pub fn nb_parameter(&self) -> u8 {
+    pub fn nb_parameter(&self) -> usize {
         match self {
             InstructionKind::Add    |
             InstructionKind::Sub    |
@@ -139,24 +142,39 @@ impl InstructionKind {
             _ => 0,
         }
     }
-}
 
-impl From<&str> for InstructionKind {
-    fn from(name: &str) -> Self {
+    pub fn get_instruction_kind(name: &str) -> Result<Self, BasmError> {
         match name {
-            "add" => InstructionKind::Add,
-            "sub" => InstructionKind::Sub,
-            "mul" => InstructionKind::Mul,
-            "div" => InstructionKind::Div,
-            _ => InstructionKind::Nop,
+            "add"   => Ok(InstructionKind::Add),
+            "sub"   => Ok(InstructionKind::Sub),
+            "mul"   => Ok(InstructionKind::Mul),
+            "div"   => Ok(InstructionKind::Div),
+            "and"   => Ok(InstructionKind::And),
+            "or"    => Ok(InstructionKind::Or),
+            "xor"   => Ok(InstructionKind::Xor),
+            "sll"   => Ok(InstructionKind::Sll),
+            "srl"   => Ok(InstructionKind::Srl),
+            "sra"   => Ok(InstructionKind::Sra),
+            "eq"    => Ok(InstructionKind::Eq),
+            "lt"    => Ok(InstructionKind::Lt),
+            "load"  => Ok(InstructionKind::Load),
+            "store" => Ok(InstructionKind::Store),
+            "push"  => Ok(InstructionKind::Push),
+            "immh"  => Ok(InstructionKind::Immh),
+            "imml"  => Ok(InstructionKind::Imml),
+            "jmp"   => Ok(InstructionKind::Jmp),
+            "jmpif" => Ok(InstructionKind::JmpIf),
+            "call"  => Ok(InstructionKind::Call),
+            "ret"   => Ok(InstructionKind::Ret),
+            "halt"  => Ok(InstructionKind::Halt),
+            "nop"   => Ok(InstructionKind::Nop),
+            _       => Err(BasmError::Default)
         }
     }
 }
 
 #[derive(Debug)]
-pub enum Parameter<'a> {
-    None,
-    Number(i32),
-    TwoNumber(i32, i32),
-    Label(&'a str),
+pub enum Parameter {
+    BeltIndex(u5),
+    Immediate(i26),
 }

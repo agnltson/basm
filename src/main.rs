@@ -1,6 +1,7 @@
 mod parser;
 mod ast;
 mod error;
+mod numerics;
 
 fn main() {
     let input = "
