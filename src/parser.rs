@@ -106,39 +106,53 @@ fn collect_u5_parameters(line: &mut SplitWhitespace) -> Result<Vec<Parameter>, B
 
 fn is_number(val: &str) -> bool {
     if let Some(first) = val.chars().next() {
-        matches!(first, '0'..'9')
+        matches!(first, '0'..'9' | '-')
     } else {
         false
     }
 }
 
+// hexa/binary representation are parser as bits pattern in two's complement (eg 0xFFFFFFFF = -1)
+// in decimal the value mean the value (eg -1 = -1)
 fn extract_number(val: &str) -> Result<i32, BasmError> {
-    let chars:Vec<char> = val.chars().into_iter().collect();
-
-    let mut radix = 10;
-    let mut start = 0;
+    let chars: Vec<char> = val.chars().collect();
+    let radix;
+    let start;
 
     if is_binary(&chars) {
-        radix = 2;
+        radix = 2u32;
         start = 2;
     } else if is_hexa(&chars) {
-        radix = 16;
+        radix = 16u32;
         start = 2;
+    } else {
+        radix = 10u32;
+        start = 0;
     }
 
     let n = (chars.len() - start) as u32;
-    let mut result = 0;
+    let mut result = 0u32;
 
     for i in start..chars.len() {
         match chars[i].to_digit(radix) {
-            None => { return Err(BasmError::Default); },
+            None => return Err(BasmError::Default),
             Some(d) => {
-                result += d * radix.pow(n - ((i+1-start) as u32));
+                result = result
+                    .checked_add(d * radix.pow(n - (i + 1 - start) as u32))
+                    .ok_or(BasmError::Default)?;
             }
         }
     }
 
-    Ok(result as i32)
+    if radix == 10 {
+        if result > i32::MAX as u32 {
+            // overflow
+            return Err(BasmError::Default);
+        }
+        Ok(result as i32)
+    } else {
+        Ok(result as i32)
+    }
 }
 
 fn is_binary(chars: &Vec<char>) -> bool {
