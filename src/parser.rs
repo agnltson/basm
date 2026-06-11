@@ -23,7 +23,13 @@ pub fn parse(input: & str) -> Result<Program, BasmError> {
         if let Some(word) = line.next() {
             let kind: InstructionKind = InstructionKind::get_instruction_kind(word)?;
             match collect_parameters(&labels, instruction_counter, &kind, &mut line) {
-                Ok(parameters) => instructions.push(Instruction::new(kind, parameters)),
+                Ok(parameters) => {
+                    if parameters.len() == kind.nb_parameter() {
+                        instructions.push(Instruction::new(kind, parameters));
+                    } else {
+                        return Err(BasmError::Default);
+                    }
+                },
                 Err(e) => { return Err(e) },
             }
         } else {
@@ -99,14 +105,46 @@ fn collect_u5_parameters(line: &mut SplitWhitespace) -> Result<Vec<Parameter>, B
 }
 
 fn is_number(val: &str) -> bool {
-    true
-    /*if let Ok(_) = val.parse::<i32>() {
-        true
+    if let Some(first) = val.chars().next() {
+        matches!(first, '0'..'9')
     } else {
         false
-    }*/
+    }
 }
 
 fn extract_number(val: &str) -> Result<i32, BasmError> {
-    Ok(0)
+    let chars:Vec<char> = val.chars().into_iter().collect();
+
+    let mut radix = 10;
+    let mut start = 0;
+
+    if is_binary(&chars) {
+        radix = 2;
+        start = 2;
+    } else if is_hexa(&chars) {
+        radix = 16;
+        start = 2;
+    }
+
+    let n = (chars.len() - start) as u32;
+    let mut result = 0;
+
+    for i in start..chars.len() {
+        match chars[i].to_digit(radix) {
+            None => { return Err(BasmError::Default); },
+            Some(d) => {
+                result += d * radix.pow(n - ((i+1-start) as u32));
+            }
+        }
+    }
+
+    Ok(result as i32)
+}
+
+fn is_binary(chars: &Vec<char>) -> bool {
+    chars[0] == '0' && chars[1] == 'b'
+}
+
+fn is_hexa(chars: &Vec<char>) -> bool {
+    chars[0] == '0' && (chars[1] == 'x' || chars[1] == 'X')
 }
