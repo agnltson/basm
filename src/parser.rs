@@ -77,8 +77,8 @@ fn collect_i26_parameters(labels: &HashMap<&str, i32>, instruction_counter: i32,
     let mut parameters = Vec::new();
     while let Some(param) = line.next() {
         if is_number(param) {
-            let val = extract_number(param)?;
-            parameters.push(Parameter::Immediate(i26(val)));
+            let val = extract_i26(param)?;
+            parameters.push(Parameter::Immediate(val));
         } else {
             if let Some(addr) = labels.get(param) {
                 let offset = addr - instruction_counter - 1;
@@ -95,8 +95,8 @@ fn collect_u5_parameters(line: &mut SplitWhitespace) -> Result<Vec<Parameter>, B
     let mut parameters = Vec::new();
     while let Some(param) = line.next() {
         if is_number(param) {
-            let val = extract_number(param)?;
-            parameters.push(Parameter::BeltIndex(u5(val as u8)));
+            let val = extract_u5(param)?;
+            parameters.push(Parameter::BeltIndex(val));
         } else {
             return Err(BasmError::Default);
         }
@@ -110,6 +110,22 @@ fn is_number(val: &str) -> bool {
     } else {
         false
     }
+}
+
+fn extract_u5(val: &str) -> Result<u5, BasmError> {
+    let val = extract_number(val)?;
+    if val < u5::MIN.into() || val > u5::MAX.into() {
+        return Err(BasmError::Default);
+    }
+    Ok(u5(val as u8))
+}
+
+fn extract_i26(val: &str) -> Result<i26, BasmError> {
+    let val = extract_number(val)?;
+    if val < i26::MIN || val > i26::MAX {
+        return Err(BasmError::Default);
+    }
+    Ok(i26(val))
 }
 
 // hexa/binary representation are parsed as bits pattern.
@@ -146,15 +162,8 @@ fn extract_number(val: &str) -> Result<i32, BasmError> {
         }
     }
 
-    if radix == 10 {
-        if result > i32::MAX as u32 {
-            // overflow
-            return Err(BasmError::Default);
-        }
-        Ok(result as i32)
-    } else {
-        Ok(result as i32)
-    }
+    // no overflow catch
+    Ok(result as i32)
 }
 
 fn is_binary(chars: &Vec<char>) -> bool {

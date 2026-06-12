@@ -4,6 +4,11 @@ use std::fmt;
 #[derive(Debug, Clone)]
 pub struct u5(pub u8);
 
+impl u5 {
+    pub const MAX: u8 = 0x1F;
+    pub const MIN: u8 = 0x00;
+}
+
 impl ops::Add<u5> for u5 {
     type Output = u5;
     fn add(self, other: u5) -> Self {
@@ -32,6 +37,11 @@ impl fmt::Binary for u5 {
 
 #[derive(Debug, Clone)]
 pub struct i26(pub i32);
+
+impl i26 {
+    pub const MAX: i32 = 0x01FFFFFFu32 as i32;
+    pub const MIN: i32 = 0x81FFFFFFu32 as i32;
+}
 
 impl ops::Add<i26> for i26 {
     type Output = i26;
