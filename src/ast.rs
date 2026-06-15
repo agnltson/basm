@@ -98,23 +98,6 @@ impl InstructionKind {
         !self.is_type1()
     }
 
-    pub fn need_immediate(&self) -> bool {
-        match self {
-            InstructionKind::Immh   |
-            InstructionKind::Imml => true,
-            _ => false,
-        }
-    }
-
-    pub fn need_label(&self) -> bool {
-        match self {
-            InstructionKind::Jmp    |
-            InstructionKind::JmpIf  |
-            InstructionKind::Call => true,
-            _ => false,
-        }
-    }
-
     pub fn nb_parameter(&self) -> usize {
         match self {
             InstructionKind::Add    |
