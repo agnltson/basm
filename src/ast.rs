@@ -72,6 +72,7 @@ pub enum InstructionKind {
 
     Nop,
 }
+
 impl InstructionKind {
     pub fn is_type1(&self) -> bool {
         match self {

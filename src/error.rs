@@ -1,4 +1,5 @@
 use colored::{Colorize, ColoredString};
+use std::fmt;
 
 #[derive(Debug, PartialEq)]
 pub enum BasmError {
@@ -12,28 +13,30 @@ pub enum BasmError {
     CompilationFailed,
 }
 
-impl BasmError {
-    pub fn to_format(&self) -> &str {
+impl fmt::Display for BasmError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BasmError::NonAsciiInput => "Non ascii character detected (sorry you have to find it yourself)",
-            BasmError::InvalidLabel => "Undefined label called",
-            BasmError::ParameterNbMismatch => "Parameter number mismatch",
-            BasmError::InvalidNumberRepr => "Invalid number representation",
-            BasmError::OutOfBoundU5 => "Out of bound u5 ([0, 31])",
-            BasmError::OutOfBoundI26 => "Out of bound i26 ([-33554432, 33554431])",
-            BasmError::NegativePattern => "Can't use negative sign before binary/hex bits pattern",
-            BasmError::CompilationFailed => "--- Compilation failed ---",
+            BasmError::NonAsciiInput => write!(f, "Non ascii character detected (sorry you have to find it yourself)"),
+            BasmError::InvalidLabel => write!(f, "Undefined label called"),
+            BasmError::ParameterNbMismatch => write!(f, "Parameter number mismatch"),
+            BasmError::InvalidNumberRepr => write!(f, "Invalid number representation"),
+            BasmError::OutOfBoundU5 => write!(f, "Out of bound u5 ([0, 31])"),
+            BasmError::OutOfBoundI26 => write!(f, "Out of bound i26 ([-33554432, 33554431])"),
+            BasmError::NegativePattern => write!(f, "Can't use negative sign before binary/hex bits pattern"),
+            BasmError::CompilationFailed => write!(f, "--- Compilation failed ---"),
         }
     }
+}
 
+impl BasmError {
     pub fn emit(&self, line_nb: usize, source_line: &str) {
         let error_prefix: ColoredString = "-- Error --".bold().red();
         if *self == BasmError::CompilationFailed {
-            eprintln!("{}", self.to_format().on_red());
+            eprintln!("{}", format!("{}", self).on_red());
         } else {
             eprintln!("{}", error_prefix);
             eprintln!("{} {}", format!("{} |", line_nb).blue(), source_line);
-            eprintln!("--> {}", self.to_format());
+            eprintln!("--> {}", self);
         }
     }
 }
