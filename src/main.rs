@@ -6,13 +6,16 @@ mod numerics;
 fn main() {
     let input = "
         main:
-            add 23, 1
+            add -1 31
+            immh 0b2
+            imml 0xM
 
             halt
+            jmp main
         ";
     let res = parser::parse(input);
     match res {
         Ok(prog) => println!("program: {:?}", prog),
-        Err(_) => (),
+        Err(e) => e.emit(0, ""),
     }
 }

@@ -160,6 +160,7 @@ impl InstructionKind {
             "load"  => Ok(InstructionKind::Load),
             "store" => Ok(InstructionKind::Store),
             "push"  => Ok(InstructionKind::Push),
+            "pop"   => Ok(InstructionKind::Pop),
             "immh"  => Ok(InstructionKind::Immh),
             "imml"  => Ok(InstructionKind::Imml),
             "jmp"   => Ok(InstructionKind::Jmp),
@@ -168,7 +169,7 @@ impl InstructionKind {
             "ret"   => Ok(InstructionKind::Ret),
             "halt"  => Ok(InstructionKind::Halt),
             "nop"   => Ok(InstructionKind::Nop),
-            _       => Err(BasmError::Default)
+            _       => Err(BasmError::CompilationFailed)
         }
     }
 }
