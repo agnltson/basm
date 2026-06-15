@@ -22,7 +22,18 @@ pub fn parse(input: & str) -> Result<Program, BasmError> {
 
     let mut compilation_failed = false;
 
-    for (line_nb, mut line) in remaining_lines.iter().map(|l| l.split_whitespace()).into_iter().enumerate() {
+    let clean_lines = remaining_lines.iter()
+        .map(|l| {
+            match l.split_once(';') {
+                None => l,
+                Some((start, _)) => start,
+            }
+        })
+        .into_iter()
+        .map(|l| l.split_whitespace())
+        .into_iter();
+
+    for (line_nb, mut line) in clean_lines.enumerate() {
         if let Some(word) = line.next() {
             let kind: InstructionKind = InstructionKind::get_instruction_kind(word)?;
             match collect_parameters(&labels, instruction_counter, &kind, &mut line) {
@@ -31,7 +42,9 @@ pub fn parse(input: & str) -> Result<Program, BasmError> {
                         instruction_counter += 1;
                         instructions.push(Instruction::new(kind, parameters));
                     } else {
-                        return Err(BasmError::ParameterNbMismatch);
+                        compilation_failed = true;
+                        BasmError::ParameterNbMismatch.emit(line_number[line_nb], remaining_lines[line_nb]);
+                        continue;
                     }
                 },
                 Err(e) => {
