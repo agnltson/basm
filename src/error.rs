@@ -7,8 +7,8 @@ pub enum BasmError {
     InvalidLabel,
     ParameterNbMismatch,
     InvalidNumberRepr,
-    OutOfBoundU5,
-    OutOfBoundI26,
+    OutOfBoundBeltIdx,
+    OutOfBoundImmediate,
     NegativePattern,
     CompilationFailed,
 }
@@ -20,8 +20,8 @@ impl fmt::Display for BasmError {
             BasmError::InvalidLabel => write!(f, "Undefined label called"),
             BasmError::ParameterNbMismatch => write!(f, "Parameter number mismatch"),
             BasmError::InvalidNumberRepr => write!(f, "Invalid number representation"),
-            BasmError::OutOfBoundU5 => write!(f, "Out of bound u5 ([0, 31])"),
-            BasmError::OutOfBoundI26 => write!(f, "Out of bound i26 ([-33554432, 33554431])"),
+            BasmError::OutOfBoundBeltIdx => write!(f, "Out of bound belt index ([0, 31])"),
+            BasmError::OutOfBoundImmediate => write!(f, "Out of bound immediate ([-33554432, 33554431])"),
             BasmError::NegativePattern => write!(f, "Can't use negative sign before binary/hex bits pattern"),
             BasmError::CompilationFailed => write!(f, "--- Compilation failed ---"),
         }

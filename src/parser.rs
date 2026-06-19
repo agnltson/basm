@@ -3,7 +3,7 @@ use std::str::SplitWhitespace;
 
 use crate::ast::{Program, InstructionKind, Instruction, Parameter};
 use crate::error::BasmError;
-use crate::numerics::{u5, i26};
+use crate::numerics::{BeltIdx, Immediate};
 
 pub fn parse(input: & str) -> Result<Program, BasmError> {
     if !input.is_ascii() {
@@ -107,13 +107,13 @@ fn collect_parameters(
     line: &mut SplitWhitespace,
     ) -> Result<Vec<Parameter>, BasmError> {
     if kind.is_type0() {
-        collect_i26_parameters(labels, instruction_counter, line)
+        collect_immediate_parameters(labels, instruction_counter, line)
     } else {
-        collect_u5_parameters(line)
+        collect_belt_idx_parameters(line)
     }
 }
 
-fn collect_i26_parameters(
+fn collect_immediate_parameters(
     labels: &HashMap<&str, i32>,
     instruction_counter: i32,
     line: &mut SplitWhitespace,
@@ -121,12 +121,12 @@ fn collect_i26_parameters(
     let mut parameters = Vec::new();
     while let Some(param) = line.next() {
         if is_number(param) {
-            let val = extract_i26(param)?;
+            let val = extract_immediate(param)?;
             parameters.push(Parameter::Immediate(val));
         } else {
             if let Some(addr) = labels.get(param) {
                 let offset = addr - instruction_counter - 1;
-                parameters.push(Parameter::Immediate(i26(offset)));
+                parameters.push(Parameter::Immediate(Immediate(offset)));
             } else {
                 return Err(BasmError::InvalidLabel);
             }
@@ -135,13 +135,13 @@ fn collect_i26_parameters(
     Ok(parameters)
 }
 
-fn collect_u5_parameters(
+fn collect_belt_idx_parameters(
     line: &mut SplitWhitespace,
     ) -> Result<Vec<Parameter>, BasmError> {
     let mut parameters = Vec::new();
     while let Some(param) = line.next() {
         if is_number(param) {
-            let val = extract_u5(param)?;
+            let val = extract_belt_idx(param)?;
             parameters.push(Parameter::BeltIndex(val));
         } else {
             return Err(BasmError::InvalidNumberRepr);
@@ -158,20 +158,20 @@ fn is_number(val: &str) -> bool {
     }
 }
 
-fn extract_u5(val: &str) -> Result<u5, BasmError> {
+fn extract_belt_idx(val: &str) -> Result<BeltIdx, BasmError> {
     let val = extract_number(val)?;
-    if val < u5::MIN.into() || val > u5::MAX.into() {
-        return Err(BasmError::OutOfBoundU5);
+    if val < BeltIdx::MIN.into() || val > BeltIdx::MAX.into() {
+        return Err(BasmError::OutOfBoundBeltIdx);
     }
-    Ok(u5(val as u8))
+    Ok(BeltIdx(val as u8))
 }
 
-fn extract_i26(val: &str) -> Result<i26, BasmError> {
+fn extract_immediate(val: &str) -> Result<Immediate, BasmError> {
     let val = extract_number(val)?;
-    if val < i26::MIN || val > i26::MAX {
-        return Err(BasmError::OutOfBoundI26);
+    if val < Immediate::MIN || val > Immediate::MAX {
+        return Err(BasmError::OutOfBoundImmediate);
     }
-    Ok(i26(val))
+    Ok(Immediate(val))
 }
 
 // hexa/binary representation are parsed as bits pattern.
@@ -224,9 +224,17 @@ fn extract_number(val: &str) -> Result<i32, BasmError> {
 }
 
 fn is_binary(chars: &Vec<char>) -> bool {
-    chars[0] == '0' && chars[1] == 'b'
+    if chars.len() < 3 {
+        false
+    } else {
+        chars[0] == '0' && chars[1] == 'b'
+    }
 }
 
 fn is_hexa(chars: &Vec<char>) -> bool {
-    chars[0] == '0' && (chars[1] == 'x' || chars[1] == 'X')
+    if chars.len() < 3 {
+        false
+    } else {
+        chars[0] == '0' && (chars[1] == 'x' || chars[1] == 'X')
+    }
 }

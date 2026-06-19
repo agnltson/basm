@@ -1,5 +1,5 @@
 use crate::error::BasmError;
-use crate::numerics::{u5, i26};
+use crate::numerics::{BeltIdx, Immediate};
 
 #[derive(Debug)]
 pub struct Program {
@@ -14,6 +14,23 @@ impl Program {
     }
 }
 
+impl Into<Vec<u8>> for Program {
+    fn into(self) -> Vec<u8> {
+        let magic: Vec<u8> = 0xD12EA2E2u32.to_le_bytes().to_vec();
+        let size: Vec<u8> = (self.instructions.len() as u32).to_le_bytes().to_vec();
+
+        let instructions: Vec<u8> = self.instructions
+            .into_iter()
+            .flat_map(|instr| {
+                let word: u32 = instr.into();
+                word.to_le_bytes()
+            })
+            .collect();
+
+        [magic, size, instructions].concat()
+    }
+}
+
 #[derive(Debug)]
 pub struct Instruction {
     kind: InstructionKind,
@@ -25,6 +42,39 @@ impl Instruction {
         Self {
             kind,
             parameter,
+        }
+    }
+}
+
+impl Into<u32> for Instruction {
+    fn into(self) -> u32 {
+        let opcode = self.kind.as_opcode() as u32;
+
+        if self.kind.is_type1() {
+            let operand_a = match &self.parameter[0] {
+                Parameter::BeltIndex(BeltIdx(v)) => (*v as u32) & 0x1F,
+                _ => unreachable!(),
+            };
+
+            let operand_b = match self.kind.nb_parameter() {
+                2 => match &self.parameter[1] {
+                    Parameter::BeltIndex(BeltIdx(v)) => (*v as u32) & 0x1F,
+                    _ => unreachable!(),
+                },
+                _ => 0u32,
+            };
+
+            (operand_b << 11) | (operand_a << 6) | opcode
+        } else {
+            let immediate = match self.kind.nb_parameter() {
+                1 => match &self.parameter[0] {
+                    Parameter::Immediate(Immediate(v)) => (*v as u32) & 0x03FFFFFF,
+                    _ => unreachable!(),
+                },
+                _ => 0u32,
+            };
+
+            (immediate << 6) | opcode
         }
     }
 }
@@ -156,10 +206,39 @@ impl InstructionKind {
             _       => Err(BasmError::CompilationFailed)
         }
     }
+
+    pub fn as_opcode(&self) -> u8 {
+        match self {
+            InstructionKind::Add    => 0b110001,
+            InstructionKind::Sub    => 0b101001,
+            InstructionKind::Mul    => 0b100101,
+            InstructionKind::Div    => 0b111001,
+            InstructionKind::And    => 0b110101,
+            InstructionKind::Or     => 0b101101,
+            InstructionKind::Xor    => 0b111101,
+            InstructionKind::Sll    => 0b100011,
+            InstructionKind::Srl    => 0b110011,
+            InstructionKind::Sra    => 0b010001,
+            InstructionKind::Eq     => 0b101011,
+            InstructionKind::Lt     => 0b111011,
+            InstructionKind::Load   => 0b100111,
+            InstructionKind::Store  => 0b110111,
+            InstructionKind::Push   => 0b101111,
+            InstructionKind::Pop    => 0b011100,
+            InstructionKind::Immh   => 0b010000,
+            InstructionKind::Imml   => 0b001000,
+            InstructionKind::Jmp    => 0b011000,
+            InstructionKind::JmpIf  => 0b000100,
+            InstructionKind::Call   => 0b010100,
+            InstructionKind::Ret    => 0b001100,
+            InstructionKind::Halt   => 0b111110,
+            InstructionKind::Nop    => 0b000000,
+        }
+    }
 }
 
 #[derive(Debug)]
 pub enum Parameter {
-    BeltIndex(u5),
-    Immediate(i26),
+    BeltIndex(BeltIdx),
+    Immediate(Immediate),
 }
