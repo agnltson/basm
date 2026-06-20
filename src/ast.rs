@@ -103,9 +103,9 @@ pub enum InstructionKind {
     Load,
     Store,
 
-    // Stack
-    Push,
-    Pop,
+    // Scratchpad
+    Put,
+    Pick,
 
     // Immediate
     Immh,
@@ -140,7 +140,8 @@ impl InstructionKind {
             InstructionKind::Lt     |
             InstructionKind::Load   |
             InstructionKind::Store  |
-            InstructionKind::Push => true,
+            InstructionKind::Put    |
+            InstructionKind::Pick => true,
             _ => false,
         }
     }
@@ -164,9 +165,10 @@ impl InstructionKind {
             InstructionKind::Eq     |
             InstructionKind::Lt     |
             InstructionKind::Load   |
-            InstructionKind::Store => 2,
+            InstructionKind::Store  |
+            InstructionKind::Put => 2,
 
-            InstructionKind::Push   |
+            InstructionKind::Pick   |
             InstructionKind::Immh   |
             InstructionKind::Imml   |
             InstructionKind::Jmp    |
@@ -193,8 +195,8 @@ impl InstructionKind {
             "lt"    => Ok(InstructionKind::Lt),
             "load"  => Ok(InstructionKind::Load),
             "store" => Ok(InstructionKind::Store),
-            "push"  => Ok(InstructionKind::Push),
-            "pop"   => Ok(InstructionKind::Pop),
+            "put"   => Ok(InstructionKind::Put),
+            "pick"  => Ok(InstructionKind::Pick),
             "immh"  => Ok(InstructionKind::Immh),
             "imml"  => Ok(InstructionKind::Imml),
             "jmp"   => Ok(InstructionKind::Jmp),
@@ -223,8 +225,8 @@ impl InstructionKind {
             InstructionKind::Lt     => 0b111011,
             InstructionKind::Load   => 0b100111,
             InstructionKind::Store  => 0b110111,
-            InstructionKind::Push   => 0b101111,
-            InstructionKind::Pop    => 0b011100,
+            InstructionKind::Put    => 0b101111,
+            InstructionKind::Pick   => 0b100001,
             InstructionKind::Immh   => 0b010000,
             InstructionKind::Imml   => 0b001000,
             InstructionKind::Jmp    => 0b011000,
