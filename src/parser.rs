@@ -152,7 +152,7 @@ fn collect_belt_idx_parameters(
 
 fn is_number(val: &str) -> bool {
     if let Some(first) = val.chars().next() {
-        matches!(first, '0'..'9' | '-')
+        matches!(first, '0'..':' | '-') // ':' = '9'+1
     } else {
         false
     }
