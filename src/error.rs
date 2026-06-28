@@ -10,6 +10,7 @@ pub enum BasmError {
     OutOfBoundBeltIdx,
     OutOfBoundImmediate,
     NegativePattern,
+    InvalidInstruction,
     CompilationFailed,
 }
 
@@ -23,6 +24,7 @@ impl fmt::Display for BasmError {
             BasmError::OutOfBoundBeltIdx => write!(f, "Out of bound belt index ([0, 31])"),
             BasmError::OutOfBoundImmediate => write!(f, "Out of bound immediate ([-33554432, 33554431])"),
             BasmError::NegativePattern => write!(f, "Can't use negative sign before binary/hex bits pattern"),
+            BasmError::InvalidInstruction => write!(f, "Invalid instruction"),
             BasmError::CompilationFailed => write!(f, "--- Compilation failed ---"),
         }
     }

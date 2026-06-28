@@ -99,8 +99,12 @@ pub enum InstructionKind {
     Lt,
 
     // Memory
-    Load,
-    Store,
+    Load8,
+    Store8,
+    Load16,
+    Store16,
+    Load32,
+    Store32,
 
     // Scratchpad
     Put,
@@ -137,8 +141,12 @@ impl InstructionKind {
             InstructionKind::Sra    |
             InstructionKind::Eq     |
             InstructionKind::Lt     |
-            InstructionKind::Load   |
-            InstructionKind::Store  |
+            InstructionKind::Load8  |
+            InstructionKind::Store8 |
+            InstructionKind::Load16 |
+            InstructionKind::Store16|
+            InstructionKind::Load32 |
+            InstructionKind::Store32|
             InstructionKind::Put    |
             InstructionKind::Pick => true,
             _ => false,
@@ -163,8 +171,12 @@ impl InstructionKind {
             InstructionKind::Sra    |
             InstructionKind::Eq     |
             InstructionKind::Lt     |
-            InstructionKind::Load   |
-            InstructionKind::Store  |
+            InstructionKind::Load8  |
+            InstructionKind::Store8 |
+            InstructionKind::Load16 |
+            InstructionKind::Store16|
+            InstructionKind::Load32 |
+            InstructionKind::Store32|
             InstructionKind::Put => 2,
 
             InstructionKind::Pick   |
@@ -180,60 +192,68 @@ impl InstructionKind {
 
     pub fn get_instruction_kind(name: &str) -> Result<Self, BasmError> {
         match name {
-            "add"   => Ok(InstructionKind::Add),
-            "sub"   => Ok(InstructionKind::Sub),
-            "mul"   => Ok(InstructionKind::Mul),
-            "div"   => Ok(InstructionKind::Div),
-            "and"   => Ok(InstructionKind::And),
-            "or"    => Ok(InstructionKind::Or),
-            "xor"   => Ok(InstructionKind::Xor),
-            "sll"   => Ok(InstructionKind::Sll),
-            "srl"   => Ok(InstructionKind::Srl),
-            "sra"   => Ok(InstructionKind::Sra),
-            "eq"    => Ok(InstructionKind::Eq),
-            "lt"    => Ok(InstructionKind::Lt),
-            "load"  => Ok(InstructionKind::Load),
-            "store" => Ok(InstructionKind::Store),
-            "put"   => Ok(InstructionKind::Put),
-            "pick"  => Ok(InstructionKind::Pick),
-            "immh"  => Ok(InstructionKind::Immh),
-            "imml"  => Ok(InstructionKind::Imml),
-            "jmp"   => Ok(InstructionKind::Jmp),
-            "jmpif" => Ok(InstructionKind::JmpIf),
-            "call"  => Ok(InstructionKind::Call),
-            "ret"   => Ok(InstructionKind::Ret),
-            "halt"  => Ok(InstructionKind::Halt),
-            "nop"   => Ok(InstructionKind::Nop),
-            _       => Err(BasmError::CompilationFailed)
+            "add"       => Ok(InstructionKind::Add),
+            "sub"       => Ok(InstructionKind::Sub),
+            "mul"       => Ok(InstructionKind::Mul),
+            "div"       => Ok(InstructionKind::Div),
+            "and"       => Ok(InstructionKind::And),
+            "or"        => Ok(InstructionKind::Or),
+            "xor"       => Ok(InstructionKind::Xor),
+            "sll"       => Ok(InstructionKind::Sll),
+            "srl"       => Ok(InstructionKind::Srl),
+            "sra"       => Ok(InstructionKind::Sra),
+            "eq"        => Ok(InstructionKind::Eq),
+            "lt"        => Ok(InstructionKind::Lt),
+            "put"       => Ok(InstructionKind::Put),
+            "pick"      => Ok(InstructionKind::Pick),
+            "load8"     => Ok(InstructionKind::Load8),
+            "store8"    => Ok(InstructionKind::Store8),
+            "load16"    => Ok(InstructionKind::Load16),
+            "store16"   => Ok(InstructionKind::Store16),
+            "load32"    => Ok(InstructionKind::Load32),
+            "store32"   => Ok(InstructionKind::Store32),
+            "immh"      => Ok(InstructionKind::Immh),
+            "imml"      => Ok(InstructionKind::Imml),
+            "jmp"       => Ok(InstructionKind::Jmp),
+            "jmpif"     => Ok(InstructionKind::JmpIf),
+            "call"      => Ok(InstructionKind::Call),
+            "ret"       => Ok(InstructionKind::Ret),
+            "halt"      => Ok(InstructionKind::Halt),
+            "nop"       => Ok(InstructionKind::Nop),
+            _           => Err(BasmError::InvalidInstruction)
         }
     }
 
     pub fn as_opcode(&self) -> u8 {
         match self {
-            InstructionKind::Add    => 0b110001,
-            InstructionKind::Sub    => 0b101001,
-            InstructionKind::Mul    => 0b100101,
-            InstructionKind::Div    => 0b111001,
-            InstructionKind::And    => 0b110101,
-            InstructionKind::Or     => 0b101101,
-            InstructionKind::Xor    => 0b111101,
-            InstructionKind::Sll    => 0b100011,
-            InstructionKind::Srl    => 0b110011,
-            InstructionKind::Sra    => 0b010001,
-            InstructionKind::Eq     => 0b101011,
-            InstructionKind::Lt     => 0b111011,
-            InstructionKind::Load   => 0b100111,
-            InstructionKind::Store  => 0b110111,
-            InstructionKind::Put    => 0b101111,
-            InstructionKind::Pick   => 0b100001,
-            InstructionKind::Immh   => 0b010000,
-            InstructionKind::Imml   => 0b001000,
-            InstructionKind::Jmp    => 0b011000,
-            InstructionKind::JmpIf  => 0b000100,
-            InstructionKind::Call   => 0b010100,
-            InstructionKind::Ret    => 0b001100,
-            InstructionKind::Halt   => 0b111110,
-            InstructionKind::Nop    => 0b000000,
+            InstructionKind::Add        => 0b000001,
+            InstructionKind::Sub        => 0b000011,
+            InstructionKind::Mul        => 0b000101,
+            InstructionKind::Div        => 0b000111,
+            InstructionKind::And        => 0b001001,
+            InstructionKind::Or         => 0b001011,
+            InstructionKind::Xor        => 0b001101,
+            InstructionKind::Sll        => 0b001111,
+            InstructionKind::Srl        => 0b010001,
+            InstructionKind::Sra        => 0b010011,
+            InstructionKind::Eq         => 0b010101,
+            InstructionKind::Lt         => 0b010111,
+            InstructionKind::Put        => 0b011001,
+            InstructionKind::Pick       => 0b011011,
+            InstructionKind::Load8      => 0b100001,
+            InstructionKind::Store8     => 0b100011,
+            InstructionKind::Load16     => 0b100101,
+            InstructionKind::Store16    => 0b100111,
+            InstructionKind::Load32     => 0b101001,
+            InstructionKind::Store32    => 0b101011,
+            InstructionKind::Immh       => 0b000010,
+            InstructionKind::Imml       => 0b000100,
+            InstructionKind::Jmp        => 0b000110,
+            InstructionKind::JmpIf      => 0b001000,
+            InstructionKind::Call       => 0b001010,
+            InstructionKind::Ret        => 0b001100,
+            InstructionKind::Halt       => 0b111110,
+            InstructionKind::Nop        => 0b000000,
         }
     }
 }
