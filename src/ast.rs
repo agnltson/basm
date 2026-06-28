@@ -3,12 +3,14 @@ use crate::numerics::{BeltIdx, Immediate};
 
 #[derive(Debug)]
 pub struct Program {
+    org: u32,
     instructions: Vec<Instruction>,
 }
 
 impl Program {
-    pub fn new(instructions: Vec<Instruction>) -> Self {
+    pub fn new(org: u32, instructions: Vec<Instruction>) -> Self {
         Self {
+            org,
             instructions,
         }
     }
@@ -17,6 +19,7 @@ impl Program {
 impl Into<Vec<u8>> for Program {
     fn into(self) -> Vec<u8> {
         let magic: Vec<u8> = 0xD12EA2E2u32.to_le_bytes().to_vec();
+        let org: Vec<u8> = self.org.to_le_bytes().to_vec();
 
         let instructions: Vec<u8> = self.instructions
             .into_iter()
@@ -26,7 +29,7 @@ impl Into<Vec<u8>> for Program {
             })
             .collect();
 
-        [magic, instructions].concat()
+        [magic, org, instructions].concat()
     }
 }
 

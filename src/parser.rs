@@ -13,8 +13,9 @@ pub fn parse(input: & str) -> Result<Program, BasmError> {
     let mut labels: HashMap<&str, i32> = HashMap::new();
     let mut remaining_lines: Vec<&str> = Vec::new();
     let mut line_number: Vec<usize> = Vec::new();
+    let mut org: u32 = 0;
 
-    separation_pass(input, &mut labels, &mut remaining_lines, &mut line_number);
+    separation_pass(input, &mut labels, &mut remaining_lines, &mut line_number, &mut org)?;
 
     let mut instruction_counter = 0;
 
@@ -60,7 +61,7 @@ pub fn parse(input: & str) -> Result<Program, BasmError> {
     if compilation_failed {
         Err(BasmError::CompilationFailed)
     } else {
-        Ok(Program::new(instructions))
+        Ok(Program::new(org, instructions))
     }
 }
 
@@ -68,36 +69,69 @@ fn separation_pass<'a>(
     input: &'a str,
     labels: &mut HashMap<&'a str, i32>,
     remaining_lines: &mut Vec<&'a str>,
-    line_number: &mut Vec<usize>
-    ) {
+    line_number: &mut Vec<usize>,
+    org: &mut u32,
+    ) -> Result<(), BasmError>{
     let mut instruction_counter = 0;
-    let mut source_line_counter = 0;
 
-    let mut lines = input.lines();
+    let lines = separate_directive(input, org)?;
 
-    while let Some(line) = lines.next() {
-        source_line_counter += 1;
+    for (line_nb, line) in lines {
 
-        let trimmed_line = line.trim();
-        let split = trimmed_line.split_once(':');
+        let split = line.split_once(':');
         match split {
             Some((label, remaining)) => {
                 labels.insert(label, instruction_counter);
                 if !remaining.is_empty() {
                     instruction_counter += 1;
                     remaining_lines.push(remaining);
-                    line_number.push(source_line_counter);
+                    line_number.push(line_nb);
                 }
             },
             None => {
-                if !trimmed_line.is_empty() {
+                if !line.is_empty() {
                     instruction_counter += 1;
-                    remaining_lines.push(trimmed_line);
-                    line_number.push(source_line_counter);
+                    remaining_lines.push(line);
+                    line_number.push(line_nb);
                 }
             }
         }
     }
+    Ok(())
+}
+
+fn separate_directive<'a>(input: &'a str, org: &mut u32) -> Result<Vec<(usize, &'a str)>, BasmError> {
+    let mut out = Vec::new();
+    let mut lines = input.lines();
+    let mut source_line_counter = 0;
+    while let Some(line) = lines.next() {
+        source_line_counter += 1;
+        if line.starts_with(".org") {
+            handle_org(&line, org)?;
+        } else {
+            out.push((source_line_counter, line.trim()));
+        }
+    }
+    Ok(out)
+}
+
+fn handle_org(line: &str, org: &mut u32) -> Result<(), BasmError> {
+    let mut split = line.split_whitespace();
+    if let Some(org) = split.next() {
+        if org != ".org" {
+            return Err(BasmError::CompilationFailed);
+        }
+    }
+    if let Some(val) = split.next() {
+        if !is_number(val) {
+            return Err(BasmError::CompilationFailed);
+        }
+        *org = extract_number(val)? as u32;
+    }
+    if split.count() != 0 {
+        return Err(BasmError::CompilationFailed);
+    }
+    Ok(())
 }
 
 fn collect_parameters(
