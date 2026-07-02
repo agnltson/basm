@@ -11,6 +11,8 @@ pub fn parse(input: & str) -> Result<Program, BasmError> {
     }
 
     let mut labels: HashMap<&str, i32> = HashMap::new();
+    let mut constants: HashMap<&str, &str> = HashMap::new();
+
     let mut remaining_lines: Vec<&str> = Vec::new();
     let mut line_number: Vec<usize> = Vec::new();
 
@@ -22,21 +24,18 @@ pub fn parse(input: & str) -> Result<Program, BasmError> {
 
     let mut compilation_failed = false;
 
-    let clean_lines = remaining_lines.iter()
-        .map(|l| {
-            match l.split_once(';') {
-                None => l,
-                Some((start, _)) => start,
-            }
-        })
-        .into_iter()
-        .map(|l| l.split_whitespace())
-        .into_iter();
+    let split_lines = remaining_lines.clone()
+                        .into_iter()
+                        .map(|l| l.split_whitespace());
 
-    for (line_nb, mut line) in clean_lines.enumerate() {
-        if let Some(word) = line.next() {
+    for (line_nb, mut words) in split_lines.enumerate() {
+        if let Some(word) = words.next() {
+            if is_directive(word) {
+                handle_directive(&mut constants, word, &mut words)?;
+                continue;
+            }
             let kind: InstructionKind = InstructionKind::get_instruction_kind(word)?;
-            match collect_parameters(&labels, instruction_counter, &kind, &mut line) {
+            match collect_parameters(&labels, &constants, instruction_counter, &kind, &mut words) {
                 Ok(parameters) => {
                     if parameters.len() == kind.nb_parameter() {
                         instruction_counter += 1;
@@ -53,8 +52,6 @@ pub fn parse(input: & str) -> Result<Program, BasmError> {
                     continue;
                 },
             }
-        } else {
-            continue; // empty line
         }
     }
     if compilation_failed {
@@ -85,7 +82,7 @@ fn separation_pass<'a>(
                 labels.insert(label, instruction_counter);
                 if !remaining.is_empty() {
                     instruction_counter += 1;
-                    remaining_lines.push(remaining);
+                    remaining_lines.push(remove_comment(remaining));
                     line_number.push(source_line_counter);
                 }
             },
@@ -100,14 +97,41 @@ fn separation_pass<'a>(
     }
 }
 
+fn handle_directive<'a>(
+    constants: &mut HashMap<&'a str, &'a str>,
+    directive: &str,
+    words: &mut SplitWhitespace<'a>
+    ) -> Result<(), BasmError> {
+    match directive {
+        ".eq" => handle_constant(constants, words),
+        _ => todo!(),
+    }
+}
+
+fn handle_constant<'a>(
+    constants: &mut HashMap<&'a str, &'a str>,
+    words: &mut SplitWhitespace<'a>
+    ) -> Result<(), BasmError> {
+    if let Some(name) = words.next() {
+        if let Some(replacement) = words.next() {
+            constants.insert(name, replacement);
+        }
+    }
+    if words.count() > 0 {
+        return Err(BasmError::ParameterNbMismatch);
+    }
+    Ok(())
+}
+
 fn collect_parameters(
     labels: &HashMap<&str, i32>,
+    constants: &HashMap<&str, &str>,
     instruction_counter: i32,
     kind: &InstructionKind,
     line: &mut SplitWhitespace,
     ) -> Result<Vec<Parameter>, BasmError> {
     if kind.is_type0() {
-        collect_immediate_parameters(labels, instruction_counter, line)
+        collect_immediate_parameters(labels, constants, instruction_counter, line)
     } else {
         collect_belt_idx_parameters(line)
     }
@@ -115,21 +139,23 @@ fn collect_parameters(
 
 fn collect_immediate_parameters(
     labels: &HashMap<&str, i32>,
+    constants: &HashMap<&str, &str>,
     instruction_counter: i32,
     line: &mut SplitWhitespace,
     ) -> Result<Vec<Parameter>, BasmError> {
     let mut parameters = Vec::new();
-    while let Some(param) = line.next() {
+    while let Some(mut param) = line.next() {
+        if let Some(replacement) = constants.get(param) {
+            param = replacement;
+        }
         if is_number(param) {
             let val = extract_immediate(param)?;
             parameters.push(Parameter::Immediate(val));
-        } else {
-            if let Some(addr) = labels.get(param) {
+        } else if let Some(addr) = labels.get(param) {
                 let offset = addr - instruction_counter - 1;
                 parameters.push(Parameter::Immediate(Immediate(offset)));
-            } else {
-                return Err(BasmError::InvalidLabel);
-            }
+        } else {
+            return Err(BasmError::InvalidParameter);
         }
     }
     Ok(parameters)
@@ -237,4 +263,18 @@ fn is_hexa(chars: &Vec<char>) -> bool {
     } else {
         chars[0] == '0' && (chars[1] == 'x' || chars[1] == 'X')
     }
+}
+
+fn remove_comment<'a>(line: &'a str) -> &'a str {
+    match line.split_once(';') {
+        None => line,
+        Some((start, _)) => start,
+    }
+}
+
+fn is_directive(word: &str) -> bool {
+    matches!(
+        word,
+        ".eq"
+        )
 }

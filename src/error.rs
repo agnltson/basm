@@ -4,7 +4,7 @@ use std::fmt;
 #[derive(Debug, PartialEq)]
 pub enum BasmError {
     NonAsciiInput,
-    InvalidLabel,
+    InvalidParameter,
     ParameterNbMismatch,
     InvalidNumberRepr,
     OutOfBoundBeltIdx,
@@ -18,7 +18,7 @@ impl fmt::Display for BasmError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             BasmError::NonAsciiInput => write!(f, "Non ascii character detected (sorry you have to find it yourself)"),
-            BasmError::InvalidLabel => write!(f, "Undefined label called"),
+            BasmError::InvalidParameter => write!(f, "Invalid parameter. If it's a label it doesn't exist."),
             BasmError::ParameterNbMismatch => write!(f, "Parameter number mismatch"),
             BasmError::InvalidNumberRepr => write!(f, "Invalid number representation"),
             BasmError::OutOfBoundBeltIdx => write!(f, "Out of bound belt index ([0, 31])"),
