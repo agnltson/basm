@@ -1,210 +1,218 @@
-use std::collections::HashMap;
+use std::collections::{
+    HashMap,
+    VecDeque,
+};
 use std::str::SplitWhitespace;
 
-use crate::ast::{Program, InstructionKind, Instruction, Parameter};
+use crate::ast::{
+    Program,
+    InstructionKind,
+    Instruction,
+    Parameter
+};
 use crate::error::BasmError;
-use crate::numerics::{BeltIdx, Immediate};
+use crate::numerics::{
+    BeltIdx,
+    Immediate
+};
 
-pub fn parse(input: & str) -> Result<Program, BasmError> {
-    if !input.is_ascii() {
-        return Err(BasmError::NonAsciiInput);
+#[derive(Debug)]
+pub struct Parser<'a> {
+    lines: Vec<(usize, &'a str)>,
+    current_line: usize,
+    labels: HashMap<&'a str, i32>,
+    constants: HashMap<&'a str, &'a str>,
+    instructions: Vec<Instruction>,
+    failed: bool,
+}
+
+impl<'a> Parser<'a> {
+    pub fn new() -> Self {
+        Self {
+            lines: Vec::new(),
+            current_line: 0,
+            labels: HashMap::new(),
+            constants: HashMap::new(),
+            instructions: Vec::new(),
+            failed: false,
+        }
     }
 
-    let mut labels: HashMap<&str, i32> = HashMap::new();
-    let mut constants: HashMap<&str, &str> = HashMap::new();
-
-    let mut remaining_lines: Vec<&str> = Vec::new();
-    let mut line_number: Vec<usize> = Vec::new();
-
-    separation_pass(input, &mut labels, &mut remaining_lines, &mut line_number);
-
-    let mut instruction_counter = 0;
-
-    let mut instructions: Vec<Instruction> = Vec::new();
-
-    let mut compilation_failed = false;
-
-    let split_lines = remaining_lines.clone()
-                        .into_iter()
-                        .map(|l| l.split_whitespace());
-
-    for (line_nb, mut words) in split_lines.enumerate() {
-        if let Some(word) = words.next() {
-            let res;
-            if is_directive(word) {
-                res = handle_directive(&mut constants, &mut instructions, word, &mut words);
-            } else {
-                res = handle_instruction(&mut labels, &mut constants, &mut instruction_counter, &mut instructions, &mut words, word);
+    pub fn parse(&mut self, input: &'a str) -> Result<Program, BasmError> {
+        self.separation_pass(input);
+        while self.current_line < self.lines.len() {
+            let (line_nb, line) = self.lines[self.current_line];
+            let mut words = line.split_whitespace();
+            if let Some(word) = words.next() {
+                let res;
+                if is_directive(word) {
+                    res = self.handle_directive(&mut words, word);
+                } else {
+                    res = self.handle_instruction(&mut words, word);
+                }
+                match res {
+                    Err(e) => {
+                        self.failed = true;
+                        e.emit(line_nb, self.lines[line_nb].1);
+                        continue;
+                    },
+                    _ => (),
+                }
             }
-            match res {
-                Err(e) => {
-                    compilation_failed = true;
-                    e.emit(line_number[line_nb], remaining_lines[line_nb]);
-                    continue;
+            self.current_line += 1;
+        }
+        if self.failed {
+            Err(BasmError::CompilationFailed)
+        } else {
+            Ok(Program::new(Vec::new()))
+        }
+    }
+
+    fn separation_pass(&mut self, input: &'a str) {
+        let mut instruction_counter = 0;
+        let mut source_line_counter = 0;
+
+        let mut lines = input.lines();
+
+        while let Some(line) = lines.next() {
+            source_line_counter += 1;
+
+            let trimmed_line = line.trim();
+            let split = trimmed_line.split_once(':');
+            match split {
+                Some((label, remaining)) => {
+                    self.labels.insert(label, instruction_counter);
+                    if !remaining.is_empty() {
+                        instruction_counter += 1;
+                        self.lines.push((source_line_counter, remove_comment(remaining)));
+                    }
                 },
-                _ => (),
-            }
-        }
-    }
-    if compilation_failed {
-        Err(BasmError::CompilationFailed)
-    } else {
-        Ok(Program::new(instructions))
-    }
-}
-
-fn separation_pass<'a>(
-    input: &'a str,
-    labels: &mut HashMap<&'a str, i32>,
-    remaining_lines: &mut Vec<&'a str>,
-    line_number: &mut Vec<usize>
-    ) {
-    let mut instruction_counter = 0;
-    let mut source_line_counter = 0;
-
-    let mut lines = input.lines();
-
-    while let Some(line) = lines.next() {
-        source_line_counter += 1;
-
-        let trimmed_line = line.trim();
-        let split = trimmed_line.split_once(':');
-        match split {
-            Some((label, remaining)) => {
-                labels.insert(label, instruction_counter);
-                if !remaining.is_empty() {
-                    instruction_counter += 1;
-                    remaining_lines.push(remove_comment(remaining));
-                    line_number.push(source_line_counter);
-                }
-            },
-            None => {
-                if !trimmed_line.is_empty() {
-                    instruction_counter += 1;
-                    remaining_lines.push(trimmed_line);
-                    line_number.push(source_line_counter);
+                None => {
+                    if !trimmed_line.is_empty() {
+                        instruction_counter += 1;
+                        self.lines.push((source_line_counter, remove_comment(trimmed_line)));
+                    }
                 }
             }
         }
     }
-}
 
-fn handle_instruction(
-    labels: &mut HashMap<&str, i32>,
-    constants: &mut HashMap<&str, &str>,
-    instruction_counter: &mut i32,
-    instructions: &mut Vec<Instruction>,
-    words: &mut SplitWhitespace,
-    word: &str,
-    ) -> Result<(), BasmError> {
+    fn handle_instruction(
+        &mut self,
+        words: &mut SplitWhitespace,
+        word: &str,
+        ) -> Result<(), BasmError> {
 
-    let kind: InstructionKind = InstructionKind::get_instruction_kind(word)?;
-    let parameters = collect_parameters(labels, constants, *instruction_counter, &kind, words)?;
+        let kind: InstructionKind = InstructionKind::get_instruction_kind(word)?;
+        let parameters = self.collect_parameters(&kind, words)?;
 
-    if parameters.len() == kind.nb_parameter() {
-        *instruction_counter += 1;
-        instructions.push(Instruction::new(kind, parameters));
+        if parameters.len() == kind.nb_parameter() {
+            self.instructions.push(Instruction::new(kind, parameters));
+            Ok(())
+        } else {
+            Err(BasmError::ParameterNbMismatch)
+        }
+    }
+
+    fn handle_directive(
+        &mut self,
+        words: &mut SplitWhitespace<'a>,
+        directive: &str,
+        ) -> Result<(), BasmError> {
+        match directive {
+            ".eq" => self.handle_constant(words),
+            ".space" => self.handle_space(words),
+            _ => todo!(),
+        }
+    }
+
+    fn collect_parameters(
+        &mut self,
+        kind: &InstructionKind,
+        words: &mut SplitWhitespace,
+        ) -> Result<Vec<Parameter>, BasmError> {
+        if kind.is_type0() {
+            self.collect_immediate_parameters(words)
+        } else if kind.is_type1() {
+            self.collect_belt_idx_parameters(words)
+        } else { // Internal instruction
+            Ok(vec![])
+        }
+    }
+
+    fn collect_immediate_parameters(
+        &mut self,
+        words: &mut SplitWhitespace,
+        ) -> Result<Vec<Parameter>, BasmError> {
+        let mut parameters = Vec::new();
+        while let Some(mut param) = words.next() {
+            if let Some(replacement) = self.constants.get(param) {
+                param = replacement;
+            }
+            if is_number(param) {
+                let val = extract_immediate(param)?;
+                parameters.push(Parameter::Immediate(val));
+            } else if let Some(addr) = self.labels.get(param) {
+                    let offset = addr - (self.instructions.len() as i32) - 1;
+                    parameters.push(Parameter::Immediate(Immediate(offset)));
+            } else {
+                return Err(BasmError::InvalidParameter);
+            }
+        }
+        Ok(parameters)
+    }
+
+    fn collect_belt_idx_parameters(
+        &mut self,
+        words: &mut SplitWhitespace,
+        ) -> Result<Vec<Parameter>, BasmError> {
+        let mut parameters = Vec::new();
+        while let Some(param) = words.next() {
+            if is_number(param) {
+                let val = extract_belt_idx(param)?;
+                parameters.push(Parameter::BeltIndex(val));
+            } else {
+                return Err(BasmError::InvalidNumberRepr);
+            }
+        }
+        Ok(parameters)
+    }
+
+    fn handle_constant(
+        &mut self,
+        words: &mut SplitWhitespace<'a>
+        ) -> Result<(), BasmError> {
+        if let Some(name) = words.next() {
+            if let Some(replacement) = words.next() {
+                self.constants.insert(name, replacement);
+            }
+        }
+        if words.count() > 0 {
+            return Err(BasmError::ParameterNbMismatch);
+        }
         Ok(())
-    } else {
-        Err(BasmError::ParameterNbMismatch)
     }
-}
 
-fn handle_directive<'a>(
-    constants: &mut HashMap<&'a str, &'a str>,
-    instructions: &mut Vec<Instruction>,
-    directive: &str,
-    words: &mut SplitWhitespace<'a>
-    ) -> Result<(), BasmError> {
-    match directive {
-        ".eq" => handle_constant(constants, words),
-        ".space" => handle_space(instructions, words),
-        _ => todo!(),
-    }
-}
-
-fn handle_constant<'a>(
-    constants: &mut HashMap<&'a str, &'a str>,
-    words: &mut SplitWhitespace<'a>
-    ) -> Result<(), BasmError> {
-    if let Some(name) = words.next() {
-        if let Some(replacement) = words.next() {
-            constants.insert(name, replacement);
+    fn handle_space(
+        &mut self,
+        words: &mut SplitWhitespace
+        ) -> Result<(), BasmError> {
+        if let Some(skip_byte) = words.next() {
+            let nb = extract_number(skip_byte)?;
+            self.instructions.push(Instruction::new(InstructionKind::InternalSpace, vec![Parameter::Immediate(Immediate(nb))]));
         }
-    }
-    if words.count() > 0 {
-        return Err(BasmError::ParameterNbMismatch);
-    }
-    Ok(())
-}
-
-fn handle_space(
-    instructions: &mut Vec<Instruction>,
-    words: &mut SplitWhitespace
-    ) -> Result<(), BasmError> {
-    if let Some(skip_byte) = words.next() {
-        let nb = extract_number(skip_byte)?;
-        instructions.push(Instruction::new(InstructionKind::InternalSpace, vec![Parameter::Immediate(Immediate(nb))]));
-    }
-    if words.count() > 0 {
-        return Err(BasmError::ParameterNbMismatch);
-    }
-    Ok(())
-}
-
-fn collect_parameters(
-    labels: &HashMap<&str, i32>,
-    constants: &HashMap<&str, &str>,
-    instruction_counter: i32,
-    kind: &InstructionKind,
-    line: &mut SplitWhitespace,
-    ) -> Result<Vec<Parameter>, BasmError> {
-    if kind.is_type0() {
-        collect_immediate_parameters(labels, constants, instruction_counter, line)
-    } else if kind.is_type1() {
-        collect_belt_idx_parameters(line)
-    } else { // Internal instruction
-        Ok(vec![])
-    }
-}
-
-fn collect_immediate_parameters(
-    labels: &HashMap<&str, i32>,
-    constants: &HashMap<&str, &str>,
-    instruction_counter: i32,
-    line: &mut SplitWhitespace,
-    ) -> Result<Vec<Parameter>, BasmError> {
-    let mut parameters = Vec::new();
-    while let Some(mut param) = line.next() {
-        if let Some(replacement) = constants.get(param) {
-            param = replacement;
+        if words.count() > 0 {
+            return Err(BasmError::ParameterNbMismatch);
         }
-        if is_number(param) {
-            let val = extract_immediate(param)?;
-            parameters.push(Parameter::Immediate(val));
-        } else if let Some(addr) = labels.get(param) {
-                let offset = addr - instruction_counter - 1;
-                parameters.push(Parameter::Immediate(Immediate(offset)));
-        } else {
-            return Err(BasmError::InvalidParameter);
-        }
+        Ok(())
     }
-    Ok(parameters)
 }
 
-fn collect_belt_idx_parameters(
-    line: &mut SplitWhitespace,
-    ) -> Result<Vec<Parameter>, BasmError> {
-    let mut parameters = Vec::new();
-    while let Some(param) = line.next() {
-        if is_number(param) {
-            let val = extract_belt_idx(param)?;
-            parameters.push(Parameter::BeltIndex(val));
-        } else {
-            return Err(BasmError::InvalidNumberRepr);
-        }
+fn remove_comment<'a>(line: &'a str) -> &'a str {
+    match line.split_once(';') {
+        None => line,
+        Some((start, _)) => start,
     }
-    Ok(parameters)
 }
 
 fn is_number(val: &str) -> bool {
@@ -293,13 +301,6 @@ fn is_hexa(chars: &Vec<char>) -> bool {
         false
     } else {
         chars[0] == '0' && (chars[1] == 'x' || chars[1] == 'X')
-    }
-}
-
-fn remove_comment<'a>(line: &'a str) -> &'a str {
-    match line.split_once(';') {
-        None => line,
-        Some((start, _)) => start,
     }
 }
 

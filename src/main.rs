@@ -15,7 +15,8 @@ fn main() {
         std::process::exit(1);
     });
 
-    let res = parser::parse(&input);
+    let mut parser = parser::Parser::new();
+    let res = parser.parse(&input);
     match res {
         Ok(prog) => {
             let bytes: Vec<u8> = prog.into();
