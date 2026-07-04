@@ -17,15 +17,10 @@ impl Program {
 impl Into<Vec<u8>> for Program {
     fn into(self) -> Vec<u8> {
         let magic: Vec<u8> = 0xD12EA2E2u32.to_le_bytes().to_vec();
-
         let instructions: Vec<u8> = self.instructions
             .into_iter()
-            .flat_map(|instr| {
-                let word: u32 = instr.into();
-                word.to_le_bytes()
-            })
+            .flat_map(|instr| -> Vec<u8> { instr.into() })
             .collect();
-
         [magic, instructions].concat()
     }
 }
@@ -45,11 +40,19 @@ impl Instruction {
     }
 }
 
-impl Into<u32> for Instruction {
-    fn into(self) -> u32 {
+impl Into<Vec<u8>> for Instruction {
+    fn into(self) -> Vec<u8> {
+        if let InstructionKind::InternalSpace = self.kind {
+            let skip_byte = match &self.parameter[0] {
+                Parameter::Immediate(Immediate(v)) => *v as usize,
+                _ => unreachable!(),
+            };
+            return vec![0u8; skip_byte];
+        }
+
         let opcode = self.kind.as_opcode() as u32;
 
-        if self.kind.is_type1() {
+        let word: u32 = if self.kind.is_type1() {
             let operand_a = match &self.parameter[0] {
                 Parameter::BeltIndex(BeltIdx(v)) => (*v as u32) & 0x1F,
                 _ => unreachable!(),
@@ -74,7 +77,9 @@ impl Into<u32> for Instruction {
             };
 
             (immediate << 6) | opcode
-        }
+        };
+
+        word.to_le_bytes().to_vec()
     }
 }
 
@@ -124,6 +129,9 @@ pub enum InstructionKind {
     Halt,
 
     Nop,
+
+    // Internal
+    InternalSpace,
 }
 
 impl InstructionKind {
@@ -154,7 +162,10 @@ impl InstructionKind {
     }
 
     pub fn is_type0(&self) -> bool {
-        !self.is_type1()
+        match self {
+            InstructionKind::InternalSpace => false,
+            _ => !self.is_type1(),
+        }
     }
 
     pub fn nb_parameter(&self) -> usize {
@@ -184,8 +195,8 @@ impl InstructionKind {
             InstructionKind::Imml   |
             InstructionKind::Jmp    |
             InstructionKind::JmpIf  |
-            InstructionKind::Call => 1,
-
+            InstructionKind::Call   |
+            InstructionKind::InternalSpace => 1,
             _ => 0,
         }
     }
@@ -220,7 +231,7 @@ impl InstructionKind {
             "ret"       => Ok(InstructionKind::Ret),
             "halt"      => Ok(InstructionKind::Halt),
             "nop"       => Ok(InstructionKind::Nop),
-            _           => Err(BasmError::InvalidInstruction)
+            _           => Err(BasmError::InvalidInstruction),
         }
     }
 
@@ -253,7 +264,8 @@ impl InstructionKind {
             InstructionKind::Call       => 0b001010,
             InstructionKind::Ret        => 0b001100,
             InstructionKind::Halt       => 0b111110,
-            InstructionKind::Nop        => 0b000000,
+            InstructionKind::Nop |
+            _                           => 0b000000,
         }
     }
 }

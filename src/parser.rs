@@ -30,27 +30,19 @@ pub fn parse(input: & str) -> Result<Program, BasmError> {
 
     for (line_nb, mut words) in split_lines.enumerate() {
         if let Some(word) = words.next() {
+            let res;
             if is_directive(word) {
-                handle_directive(&mut constants, word, &mut words)?;
-                continue;
+                res = handle_directive(&mut constants, &mut instructions, word, &mut words);
+            } else {
+                res = handle_instruction(&mut labels, &mut constants, &mut instruction_counter, &mut instructions, &mut words, word);
             }
-            let kind: InstructionKind = InstructionKind::get_instruction_kind(word)?;
-            match collect_parameters(&labels, &constants, instruction_counter, &kind, &mut words) {
-                Ok(parameters) => {
-                    if parameters.len() == kind.nb_parameter() {
-                        instruction_counter += 1;
-                        instructions.push(Instruction::new(kind, parameters));
-                    } else {
-                        compilation_failed = true;
-                        BasmError::ParameterNbMismatch.emit(line_number[line_nb], remaining_lines[line_nb]);
-                        continue;
-                    }
-                },
+            match res {
                 Err(e) => {
                     compilation_failed = true;
                     e.emit(line_number[line_nb], remaining_lines[line_nb]);
                     continue;
                 },
+                _ => (),
             }
         }
     }
@@ -97,13 +89,36 @@ fn separation_pass<'a>(
     }
 }
 
+fn handle_instruction(
+    labels: &mut HashMap<&str, i32>,
+    constants: &mut HashMap<&str, &str>,
+    instruction_counter: &mut i32,
+    instructions: &mut Vec<Instruction>,
+    words: &mut SplitWhitespace,
+    word: &str,
+    ) -> Result<(), BasmError> {
+
+    let kind: InstructionKind = InstructionKind::get_instruction_kind(word)?;
+    let parameters = collect_parameters(labels, constants, *instruction_counter, &kind, words)?;
+
+    if parameters.len() == kind.nb_parameter() {
+        *instruction_counter += 1;
+        instructions.push(Instruction::new(kind, parameters));
+        Ok(())
+    } else {
+        Err(BasmError::ParameterNbMismatch)
+    }
+}
+
 fn handle_directive<'a>(
     constants: &mut HashMap<&'a str, &'a str>,
+    instructions: &mut Vec<Instruction>,
     directive: &str,
     words: &mut SplitWhitespace<'a>
     ) -> Result<(), BasmError> {
     match directive {
         ".eq" => handle_constant(constants, words),
+        ".space" => handle_space(instructions, words),
         _ => todo!(),
     }
 }
@@ -123,6 +138,20 @@ fn handle_constant<'a>(
     Ok(())
 }
 
+fn handle_space(
+    instructions: &mut Vec<Instruction>,
+    words: &mut SplitWhitespace
+    ) -> Result<(), BasmError> {
+    if let Some(skip_byte) = words.next() {
+        let nb = extract_number(skip_byte)?;
+        instructions.push(Instruction::new(InstructionKind::InternalSpace, vec![Parameter::Immediate(Immediate(nb))]));
+    }
+    if words.count() > 0 {
+        return Err(BasmError::ParameterNbMismatch);
+    }
+    Ok(())
+}
+
 fn collect_parameters(
     labels: &HashMap<&str, i32>,
     constants: &HashMap<&str, &str>,
@@ -132,8 +161,10 @@ fn collect_parameters(
     ) -> Result<Vec<Parameter>, BasmError> {
     if kind.is_type0() {
         collect_immediate_parameters(labels, constants, instruction_counter, line)
-    } else {
+    } else if kind.is_type1() {
         collect_belt_idx_parameters(line)
+    } else { // Internal instruction
+        Ok(vec![])
     }
 }
 
@@ -275,6 +306,7 @@ fn remove_comment<'a>(line: &'a str) -> &'a str {
 fn is_directive(word: &str) -> bool {
     matches!(
         word,
-        ".eq"
+        ".eq"       |
+        ".space"
         )
 }
