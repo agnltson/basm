@@ -40,7 +40,7 @@ pub struct Immediate(pub i32);
 
 impl Immediate {
     pub const MAX: i32 = 0x01FFFFFFu32 as i32;
-    pub const MIN: i32 = 0x81FFFFFFu32 as i32;
+    pub const MIN: i32 = 0xFE000000u32 as i32;
 }
 
 impl ops::Add<Immediate> for Immediate {
@@ -59,13 +59,12 @@ impl ops::Sub<Immediate> for Immediate {
 
 impl fmt::Display for Immediate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0 & 0x83FFFFFFu32 as i32)
+        write!(f, "{}", self.0)
     }
 }
 
 impl fmt::Binary for Immediate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let sign = self.0 & 0x80000000u32 as i32;
-        write!(f, "{:b}", (self.0 | (sign >> 5)) & 0x01FFFFFFu32 as i32)
+        write!(f, "{:026b}", self.0 & 0x03FFFFFFu32 as i32)
     }
 }
