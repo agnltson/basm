@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
-    str::SplitWhitespace
+    str::SplitWhitespace,
+    mem,
 };
 
 use crate::{
@@ -16,7 +17,7 @@ use crate::{
 #[derive(Debug)]
 pub struct PreProc<'a> {
     preprocessed_lines: Vec<AnnotatedLine<'a>>,
-    labels: HashMap<&'a str, i32>,
+    labels: HashMap<&'a str, usize>,
     constants: HashMap<&'a str, &'a str>,
     macros: HashMap<&'a str, Vec<Line<'a>>>,
     current_line: usize,
@@ -35,11 +36,23 @@ impl<'a> PreProc<'a> {
         }
     }
 
-    pub fn preprocess(&mut self, input: &'a str) -> Result<Vec<AnnotatedLine<'a>>, BasmError> {
-        let cleaned_lines = self.separation_pass(input);
+    pub fn take_labels(&mut self) -> HashMap<&'a str, usize> {
+        mem::take(&mut self.labels)
+    }
 
-        while self.current_line < cleaned_lines.len() {
-            let mut words = cleaned_lines[self.current_line].split_whitespace();
+    pub fn preprocess(
+        &mut self,
+        input: &'a str
+    ) -> Result<Vec<AnnotatedLine<'a>>, BasmError> {
+        let mut lines = input.lines().map(|l| remove_comment(l.trim()));
+
+        while let Some(line) = lines.next() {
+            let cleaned_line = self.handle_label(line);
+            if cleaned_line.is_empty() {
+                continue;
+            }
+
+            let mut words = cleaned_line.split_whitespace();
             if let Some(word) = words.next() {
                 if is_directive(word) {
                     self.handle_directive(&mut words, word)?;
@@ -48,8 +61,20 @@ impl<'a> PreProc<'a> {
                 }
             }
         }
+        Ok(mem::take(&mut self.preprocessed_lines))
+    }
 
-        Ok(self.preprocessed_lines.clone())
+    fn handle_label(&mut self, line: &'a str) -> &'a str {
+        match line.split_once(':') {
+            Some((label, remaining)) => {
+                let label = label.trim();
+                if !label.is_empty() {
+                    self.labels.insert(label, self.location_counter);
+                }
+                remaining.trim()
+            }
+            None => line,
+        }
     }
 
     fn handle_instruction(
@@ -118,35 +143,6 @@ impl<'a> PreProc<'a> {
             return Err(BasmError::ParameterNbMismatch);
         }
         Ok(())
-    }
-
-    fn separation_pass(&mut self, input: &'a str) -> Vec<&'a str> {
-        let mut instruction_counter = 0;
-        let mut lines = input.lines();
-
-        let mut out_lines = Vec::new();
-
-        while let Some(line) = lines.next() {
-
-            let trimmed_line = line.trim();
-            let split = trimmed_line.split_once(':');
-            match split {
-                Some((label, remaining)) => {
-                    self.labels.insert(label, instruction_counter);
-                    if !remaining.is_empty() {
-                        instruction_counter += 1;
-                        out_lines.push(remove_comment(remaining));
-                    }
-                },
-                None => {
-                    if !trimmed_line.is_empty() {
-                        instruction_counter += 1;
-                        out_lines.push(remove_comment(trimmed_line));
-                    }
-                }
-            }
-        }
-        out_lines
     }
 }
 

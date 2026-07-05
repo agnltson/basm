@@ -1,4 +1,7 @@
-use std::mem;
+use std::{
+    mem,
+    collections::HashMap,
+};
 use crate::{
         ast::{
             Program,
@@ -24,26 +27,32 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct Parser {
+pub struct Parser<'a> {
+    labels: HashMap<&'a str, usize>,
     instructions: Vec<Instruction>,
+    location_counter: usize,
     failed: bool,
 }
 
-impl Parser {
+impl<'a> Parser<'a> {
     pub fn new() -> Self {
         Self {
+            labels: HashMap::new(),
             instructions: Vec::new(),
+            location_counter: 0,
             failed: false,
         }
     }
 
-    pub fn parse(&mut self, input: &str) -> Result<Program, BasmError> {
+    pub fn parse(&mut self, input: &'a str) -> Result<Program, BasmError> {
         if !input.is_ascii() {
             return Err(BasmError::NonAsciiInput);
         }
         let mut preproc = PreProc::new();
         let preprocessed_lines = preproc.preprocess(input)?;
+        self.labels = preproc.take_labels();
         for line in preprocessed_lines.into_iter() {
+            self.location_counter += line.location;
             match self.handle_instruction(&line) {
                     Err(e) => {
                         self.failed = true;
@@ -62,7 +71,7 @@ impl Parser {
 
     fn handle_instruction(
         &mut self,
-        ann_line: &AnnotatedLine,
+        ann_line: &AnnotatedLine<'a>,
     ) -> Result<(), BasmError> {
         let mut words = ann_line.line.clone().into_iter();
         if let Some(inst_name) = words.next() {
@@ -83,7 +92,7 @@ impl Parser {
     fn collect_parameters(
         &mut self,
         kind: &InstructionKind,
-        words: &mut Line,
+        words: &mut Line<'a>,
     ) -> Result<Vec<Parameter>, BasmError> {
         if kind.is_type0() {
             self.collect_immediate_parameters(words)
@@ -94,13 +103,15 @@ impl Parser {
 
     fn collect_immediate_parameters(
         &mut self,
-        words: &mut Line,
-    ) -> Result<Vec<Parameter>, BasmError> {
+        words: &mut Line<'a>,
+        ) -> Result<Vec<Parameter>, BasmError> {
         let mut parameters = Vec::new();
         while let Some(param) = words.next() {
             if is_number(param) {
                 let val = extract_immediate(param)?;
                 parameters.push(Parameter::Immediate(val));
+            } else if let Some(addr) = self.labels.get(param) {
+                    parameters.push(Parameter::Immediate(Immediate(*addr as i32)));
             } else {
                 return Err(BasmError::InvalidParameter);
             }
@@ -110,7 +121,7 @@ impl Parser {
 
     fn collect_belt_idx_parameters(
         &mut self,
-        words: &mut Line,
+        words: &mut Line<'a>,
     ) -> Result<Vec<Parameter>, BasmError> {
         let mut parameters = Vec::new();
         while let Some(param) = words.next() {
