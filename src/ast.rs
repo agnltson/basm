@@ -16,7 +16,6 @@ impl Program {
 
 impl Into<Vec<u8>> for Program {
     fn into(self) -> Vec<u8> {
-        println!("prog: {:?}", self);
         let mut instructions: Vec<u8> = Vec::new();
         let mut cursor: usize = 0;
 
