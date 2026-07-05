@@ -16,24 +16,40 @@ impl Program {
 
 impl Into<Vec<u8>> for Program {
     fn into(self) -> Vec<u8> {
+        println!("prog: {:?}", self);
         let magic: Vec<u8> = 0xD12EA2E2u32.to_le_bytes().to_vec();
-        let instructions: Vec<u8> = self.instructions
-            .into_iter()
-            .flat_map(|instr| -> Vec<u8> { instr.into() })
-            .collect();
+
+        let mut instructions: Vec<u8> = Vec::new();
+        let mut cursor: usize = 0;
+
+        for instr in self.instructions {
+            let location = instr.location;
+
+            if location > cursor {
+                instructions.extend(std::iter::repeat(0u8).take(location - cursor));
+                cursor = location;
+            }
+
+            let bytes: Vec<u8> = instr.into();
+            cursor += bytes.len();
+            instructions.extend(bytes);
+        }
+
         [magic, instructions].concat()
     }
 }
 
 #[derive(Debug)]
 pub struct Instruction {
+    location: usize,
     kind: InstructionKind,
     parameter: Vec<Parameter>,
 }
 
 impl Instruction {
-    pub fn new(kind: InstructionKind, parameter: Vec<Parameter>) -> Self {
+    pub fn new(location: usize, kind: InstructionKind, parameter: Vec<Parameter>) -> Self {
         Self {
+            location,
             kind,
             parameter,
         }
@@ -42,14 +58,6 @@ impl Instruction {
 
 impl Into<Vec<u8>> for Instruction {
     fn into(self) -> Vec<u8> {
-        if let InstructionKind::InternalSpace = self.kind {
-            let skip_byte = match &self.parameter[0] {
-                Parameter::Immediate(Immediate(v)) => *v as usize,
-                _ => unreachable!(),
-            };
-            return vec![0u8; skip_byte];
-        }
-
         let opcode = self.kind.as_opcode() as u32;
 
         let word: u32 = if self.kind.is_type1() {
@@ -129,9 +137,6 @@ pub enum InstructionKind {
     Halt,
 
     Nop,
-
-    // Internal
-    InternalSpace,
 }
 
 impl InstructionKind {
@@ -162,10 +167,7 @@ impl InstructionKind {
     }
 
     pub fn is_type0(&self) -> bool {
-        match self {
-            InstructionKind::InternalSpace => false,
-            _ => !self.is_type1(),
-        }
+        !self.is_type1()
     }
 
     pub fn nb_parameter(&self) -> usize {
@@ -195,8 +197,7 @@ impl InstructionKind {
             InstructionKind::Imml   |
             InstructionKind::Jmp    |
             InstructionKind::JmpIf  |
-            InstructionKind::Call   |
-            InstructionKind::InternalSpace => 1,
+            InstructionKind::Call => 1,
             _ => 0,
         }
     }
@@ -264,8 +265,7 @@ impl InstructionKind {
             InstructionKind::Call       => 0b001010,
             InstructionKind::Ret        => 0b001100,
             InstructionKind::Halt       => 0b111110,
-            InstructionKind::Nop |
-            _                           => 0b000000,
+            InstructionKind::Nop        => 0b000000,
         }
     }
 }

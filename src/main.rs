@@ -2,6 +2,8 @@ mod parser;
 mod ast;
 mod error;
 mod numerics;
+mod preproc;
+mod utils;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -25,6 +27,6 @@ fn main() {
                 std::process::exit(1);
             });
         },
-        Err(e) => e.emit(0, ""),
+        Err(e) => e.emit("", utils::AnnotatedLine::new(0, utils::SourceKind::SourceLine(0), utils::Line::new(Vec::new()))),
     }
 }

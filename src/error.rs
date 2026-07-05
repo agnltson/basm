@@ -1,6 +1,11 @@
 use colored::{Colorize, ColoredString};
 use std::fmt;
 
+use crate::utils::{
+    AnnotatedLine,
+    SourceKind,
+};
+
 #[derive(Debug, PartialEq)]
 pub enum BasmError {
     NonAsciiInput,
@@ -31,13 +36,23 @@ impl fmt::Display for BasmError {
 }
 
 impl BasmError {
-    pub fn emit(&self, line_nb: usize, source_line: &str) {
+    pub fn emit(&self, source: &str, annotated_lines: AnnotatedLine) {
         let error_prefix: ColoredString = "-- Error --".bold().red();
         if *self == BasmError::CompilationFailed {
             eprintln!("{}", format!("{}", self).on_red());
         } else {
+            let source_lines: Vec<&str> = source.lines().into_iter().collect();
             eprintln!("{}", error_prefix);
-            eprintln!("{} {}", format!("{} |", line_nb).blue(), source_line);
+            match annotated_lines.source_kind {
+                SourceKind::SourceLine(line_nb) => {
+                    eprintln!("{} {}", format!("{} |", line_nb).blue(), source_lines[line_nb]);
+                },
+                SourceKind::MacroExpansion(macro_name, line_nb) => {
+                    eprintln!("In expansion of macro {}", format!("{}", macro_name).green());
+                    eprintln!("{} {}", format!("{} |", line_nb).blue(), source_lines[line_nb]);
+                },
+
+            }
             eprintln!("--> {}", self);
         }
     }
