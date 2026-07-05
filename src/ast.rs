@@ -17,8 +17,6 @@ impl Program {
 impl Into<Vec<u8>> for Program {
     fn into(self) -> Vec<u8> {
         println!("prog: {:?}", self);
-        let magic: Vec<u8> = 0xD12EA2E2u32.to_le_bytes().to_vec();
-
         let mut instructions: Vec<u8> = Vec::new();
         let mut cursor: usize = 0;
 
@@ -35,7 +33,7 @@ impl Into<Vec<u8>> for Program {
             instructions.extend(bytes);
         }
 
-        [magic, instructions].concat()
+        instructions
     }
 }
 
