@@ -45,6 +45,40 @@ impl<'a> AnnotatedLine<'a> {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct Macro<'a> {
+    nb_parameter: u8,
+    content: Vec<(usize, &'a str)>, // (source line nb, line content)
+}
+
+impl<'a> Macro<'a> {
+    pub fn new(nb_parameter: u8, content: Vec<(usize, &'a str)>) -> Self {
+        Self {
+            nb_parameter,
+            content,
+        }
+    }
+
+    pub fn nb_parameter(&self) -> u8 {
+        self.nb_parameter
+    }
+
+    pub fn content(&self) -> &[(usize, &'a str)] {
+        &self.content
+    }
+}
+
+pub fn is_valid_identifier(ident: &str) -> bool {
+    let mut chars = ident.chars();
+
+    match chars.next() {
+        Some(c) if c.is_ascii_alphabetic() || c == '_' => {}
+        _ => return false,
+    }
+
+    chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
 pub fn extract_number(val: &str) -> Result<i32, BasmError> {
     let mut chars: Vec<char> = val.chars().collect();
     let radix;

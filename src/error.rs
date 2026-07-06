@@ -16,6 +16,10 @@ pub enum BasmError {
     OutOfBoundImmediate,
     NegativePattern,
     InvalidInstruction,
+    InvalidLabelDefinition,
+    ToManyParameter,
+    EmptyMacroDefinition,
+    NeverEndingMacro,
     CompilationFailed,
 }
 
@@ -30,6 +34,11 @@ impl fmt::Display for BasmError {
             BasmError::OutOfBoundImmediate => write!(f, "Out of bound immediate ([-33554432, 33554431])"),
             BasmError::NegativePattern => write!(f, "Can't use negative sign before binary/hex bits pattern"),
             BasmError::InvalidInstruction => write!(f, "Invalid instruction"),
+            BasmError::InvalidLabelDefinition =>
+                write!(f, "Invalid label definition. Using invalid chars in label or instruction name as label"),
+            BasmError::ToManyParameter => write!(f, "Maximum macro parameter is 9"),
+            BasmError::EmptyMacroDefinition => write!(f, "Trying to define a macro without a name"),
+            BasmError::NeverEndingMacro => write!(f, "A macro is started but never ended"),
             BasmError::CompilationFailed => write!(f, "--- Compilation failed ---"),
         }
     }
@@ -43,6 +52,9 @@ impl BasmError {
         } else {
             let source_lines: Vec<&str> = source.lines().into_iter().collect();
             eprintln!("{}", error_prefix);
+            if source_lines.len() == 0 {
+                return;
+            }
             match annotated_lines.source_kind {
                 SourceKind::SourceLine(line_nb) => {
                     eprintln!("{} {}", format!("{} |", line_nb).blue(), source_lines[line_nb]);
